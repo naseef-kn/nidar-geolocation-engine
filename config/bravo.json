@@ -1,0 +1,6 @@
+{
+  "drone_id": "bravo",
+  "capabilities": ["scout", "delivery"],
+  "telemetry_source": "simulated",
+  "camera_calibration_file": null
+}
