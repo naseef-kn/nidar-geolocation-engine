@@ -2,5 +2,6 @@
   "drone_id": "alpha",
   "capabilities": ["scout", "delivery"],
   "telemetry_source": "simulated",
-  "camera_calibration_file": null
+  "camera_calibration_file": null,
+  "packet_kg": 0.2
 }
