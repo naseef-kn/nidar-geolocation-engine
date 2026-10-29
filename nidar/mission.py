@@ -82,6 +82,10 @@ class TargetRegistry:
             raise UnknownTargetError(f"Unknown target {target.target_id!r}")
         self._targets[target.target_id] = target
 
+    def all(self) -> list[Target]:
+        """Return all registered targets."""
+        return list(self._targets.values())
+
     def unassigned_detected(self) -> list[Target]:
         """Targets still waiting for assignment, highest confidence first."""
         detected = [

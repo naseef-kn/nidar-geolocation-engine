@@ -15,7 +15,9 @@ from nidar.transport import GCS_ID, Message, Transport
 # heartbeat is allowed for every drone.
 MESSAGE_TYPES_BY_CAPABILITY = {
     "scout": frozenset({"target_found", "scout_status"}),
-    "delivery": frozenset({"delivery_started", "delivery_complete"}),
+    "delivery": frozenset(
+        {"delivery_started", "delivery_dropping", "delivery_complete"}
+    ),
 }
 ALWAYS_ALLOWED = frozenset({"heartbeat"})
 
