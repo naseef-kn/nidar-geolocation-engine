@@ -16,11 +16,25 @@ def setup():
     return transport, coord
 
 
-def report_target(transport, sender, target_id, confidence, lat=12.97, lon=77.59):
+def report_target(
+    transport,
+    sender,
+    target_id,
+    confidence,
+    phase="outbound",
+    lat=12.97,
+    lon=77.59,
+):
     transport.send(Message(sender, GCS_ID, "target_found", {
         "target_id": target_id, "latitude": lat,
-        "longitude": lon, "confidence": confidence,
+        "longitude": lon, "confidence": confidence, "phase": phase,
     }))
+
+
+def set_payload(transport, coord, drone_id, remaining):
+    transport.send(Message(drone_id, GCS_ID, "scout_status",
+                           {"payload_remaining": remaining}))
+    coord.process_inbox()
 
 
 def drain(transport, endpoint):
@@ -100,27 +114,6 @@ def test_dropping_report_blocks_switch(setup):
     assert coord.registry.get("t2").status is TargetStatus.DETECTED
 
 
-# --- Reassignment ---
-
-def test_high_confidence_target_switches_low_confidence_delivery(setup):
-    transport, coord = setup
-    report_target(transport, "alpha", "t1", 0.4)
-    coord.process_inbox()
-    drone = coord.assign_new_delivery("t1")
-    transport.send(Message(drone, GCS_ID, "delivery_started", {"target_id": "t1"}))
-    coord.process_inbox()
-    drain(transport, drone)
-
-    report_target(transport, "alpha", "t2", 0.95)
-    coord.process_inbox()
-
-    assert coord.registry.get("t1").status is TargetStatus.FLAGGED
-    assert coord.registry.get("t2").assigned_to == drone
-    switch = drain(transport, drone)
-    assert [m.msg_type for m in switch] == ["mission_switch"]
-    assert switch[0].payload == {"target_id": "t2"}
-
-
 def test_no_switch_when_delivery_is_confident(setup):
     transport, coord = setup
     report_target(transport, "alpha", "t1", 0.8)
@@ -141,3 +134,60 @@ def test_scout_status_updates_payload(setup):
     transport.send(Message("alpha", GCS_ID, "scout_status", {"payload_remaining": 4}))
     coord.process_inbox()
     assert coord.payload_remaining("alpha") == 4
+
+
+# --- Alert rule ---
+
+def test_wayback_high_conf_empty_reporter_alerts_other_drone(setup):
+    transport, coord = setup
+    set_payload(transport, coord, "alpha", 0)
+    report_target(transport, "alpha", "t1", 0.95, phase="wayback")
+    coord.process_inbox()
+    alerts = drain(transport, "bravo")
+    assert [m.msg_type for m in alerts] == ["target_alert"]
+    assert alerts[0].payload["target_id"] == "t1"
+    assert alerts[0].payload["reported_by"] == "alpha"
+    assert coord.alerts == [("bravo", "t1")]
+
+
+def test_alert_does_not_change_target_status(setup):
+    transport, coord = setup
+    set_payload(transport, coord, "alpha", 0)
+    report_target(transport, "alpha", "t1", 0.95, phase="wayback")
+    coord.process_inbox()
+    t = coord.registry.get("t1")
+    assert t.status is TargetStatus.DETECTED
+    assert t.assigned_to is None
+
+
+def test_outbound_high_conf_does_not_alert(setup):
+    transport, coord = setup
+    set_payload(transport, coord, "alpha", 0)
+    report_target(transport, "alpha", "t1", 0.95, phase="outbound")
+    coord.process_inbox()
+    assert drain(transport, "bravo") == []
+    assert coord.alerts == []
+
+
+def test_wayback_with_reporter_payload_does_not_alert(setup):
+    transport, coord = setup
+    report_target(transport, "alpha", "t1", 0.95, phase="wayback")
+    coord.process_inbox()
+    assert coord.alerts == []
+
+
+def test_wayback_below_high_confidence_does_not_alert(setup):
+    transport, coord = setup
+    set_payload(transport, coord, "alpha", 0)
+    report_target(transport, "alpha", "t1", 0.7, phase="wayback")
+    coord.process_inbox()
+    assert coord.alerts == []
+
+
+def test_no_alert_when_no_other_drone_has_payload(setup):
+    transport, coord = setup
+    set_payload(transport, coord, "alpha", 0)
+    set_payload(transport, coord, "bravo", 0)
+    report_target(transport, "alpha", "t1", 0.95, phase="wayback")
+    coord.process_inbox()
+    assert coord.alerts == []

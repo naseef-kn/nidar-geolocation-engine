@@ -10,7 +10,6 @@ from nidar.mission import (
     Target,
     TargetRegistry,
     TargetStatus,
-    switch_delivery,
 )
 from nidar.transport import GCS_ID, Message, Transport
 
@@ -26,6 +25,8 @@ class Coordinator:
         self._payload: dict[str, int] = {}
         # Drones this coordinator may assign deliveries to.
         self._known_drones: set[str] = set()
+        # Alerts sent so far, as (drone_id, target_id). Kept for tests and debugging.
+        self.alerts: list[tuple[str, str]] = []
 
     def register_drone(self, drone_id: str, payload_capacity: int) -> None:
         """
@@ -67,7 +68,11 @@ class Coordinator:
             confidence=p["confidence"],
         )
         self.registry.add(target)
-        self._maybe_switch_for(target)
+        self._maybe_alert_for(
+            target,
+            reporter=message.sender,
+            phase=p.get("phase", "outbound"),
+        )
 
     def _on_delivery_started(self, message: Message) -> None:
         self._set_status(message.payload["target_id"], TargetStatus.IN_DELIVERY)
@@ -118,29 +123,42 @@ class Coordinator:
         self._send_to(drone_id, "mission_start", {"target_id": target_id})
         return drone_id
 
-    def _maybe_switch_for(self, candidate: Target) -> None:
-        """If a delivering drone should switch to this candidate, do it."""
-        for current in self._in_delivery_targets():
-            if switch_delivery(
-                self.registry, current.target_id, candidate.target_id, self._policy
-            ):
-                drone_id = self.registry.get(candidate.target_id).assigned_to
-                if drone_id is not None:
-                    self._send_to(
-                        drone_id,
-                        "mission_switch",
-                        {"target_id": candidate.target_id},
-                    )
-                return
+    def _maybe_alert_for(
+        self, target: Target, reporter: str, phase: str
+    ) -> str | None:
+        """
+        Alert another drone to a high-confidence target seen on a return leg,
+        when the reporting drone has no payload left.
+
+        Returns the alerted drone ID, or None if no alert was sent.
+        """
+        if phase != "wayback":
+            return None
+        if target.confidence < self._policy.high_confidence_at:
+            return None
+        if self.payload_remaining(reporter) > 0:
+            return None
+
+        candidates = sorted(
+            d for d in self._known_drones
+            if d != reporter and self._payload.get(d, 0) > 0
+        )
+        if not candidates:
+            return None
+        # max() returns the first maximum, so ties go to the alphabetically first drone.
+        drone_id = max(candidates, key=lambda d: self._payload[d])
+
+        self._send_to(drone_id, "target_alert", {
+            "target_id": target.target_id,
+            "latitude": target.latitude,
+            "longitude": target.longitude,
+            "confidence": target.confidence,
+            "reported_by": reporter,
+        })
+        self.alerts.append((drone_id, target.target_id))
+        return drone_id
 
     # --- Helpers ---
-
-    def _in_delivery_targets(self) -> list[Target]:
-        return [
-            target
-            for target in self.registry.all()
-            if target.status is TargetStatus.IN_DELIVERY
-        ]
 
     def _set_status(self, target_id: str, status: TargetStatus) -> None:
         target = self.registry.get(target_id)
