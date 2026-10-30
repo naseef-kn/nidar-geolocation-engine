@@ -20,6 +20,7 @@ MESSAGE_TYPES_BY_CAPABILITY = {
     ),
 }
 ALWAYS_ALLOWED = frozenset({"heartbeat"})
+VALID_PHASES = frozenset({"outbound", "wayback"})
 
 
 class MessageNotAllowedError(Exception):
@@ -58,6 +59,32 @@ class Drone:
                 payload=payload or {},
             )
         )
+
+    def report_target(
+        self,
+        target_id: str,
+        latitude: float,
+        longitude: float,
+        confidence: float,
+        phase: str = "outbound",
+    ) -> None:
+        """
+        Report a detected target to the GCS.
+
+        phase is "outbound" (flying to the delivery area) or "wayback"
+        (returning). The coordinator alerts other drones only for wayback reports.
+        """
+        if phase not in VALID_PHASES:
+            raise ValueError(
+                f"phase must be one of {sorted(VALID_PHASES)}, got {phase!r}"
+            )
+        self.send_to_gcs("target_found", {
+            "target_id": target_id,
+            "latitude": latitude,
+            "longitude": longitude,
+            "confidence": confidence,
+            "phase": phase,
+        })
 
     def poll(self) -> list[Message]:
         """Return all pending messages for this drone, oldest first."""

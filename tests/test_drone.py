@@ -125,3 +125,35 @@ def test_two_drones_end_to_end(transport):
     bravo_inbox = bravo.poll()
     assert len(bravo_inbox) == 1
     assert bravo_inbox[0].payload == {"target": 1}
+
+
+# --- Target reporting with phase ---
+
+def test_report_target_includes_phase(transport):
+    drone = make_drone(transport, capabilities=("scout",))
+    drone.report_target("t1", 12.97, 77.59, 0.9, phase="wayback")
+    m = transport.receive(GCS_ID)
+    assert m.msg_type == "target_found"
+    assert m.payload == {
+        "target_id": "t1", "latitude": 12.97, "longitude": 77.59,
+        "confidence": 0.9, "phase": "wayback",
+    }
+
+
+def test_report_target_defaults_to_outbound(transport):
+    drone = make_drone(transport, capabilities=("scout",))
+    drone.report_target("t1", 12.97, 77.59, 0.9)
+    assert transport.receive(GCS_ID).payload["phase"] == "outbound"
+
+
+def test_report_target_invalid_phase_rejected(transport):
+    drone = make_drone(transport, capabilities=("scout",))
+    with pytest.raises(ValueError, match="phase"):
+        drone.report_target("t1", 12.97, 77.59, 0.9, phase="landing")
+    assert transport.receive(GCS_ID) is None
+
+
+def test_delivery_only_drone_cannot_report_target(transport):
+    drone = make_drone(transport, capabilities=("delivery",))
+    with pytest.raises(MessageNotAllowedError):
+        drone.report_target("t1", 12.97, 77.59, 0.9)
