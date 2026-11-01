@@ -1,87 +1,86 @@
 # NIDAR configuration guide
 
-This guide lists every value that can be configured, where it lives, its unit,
-and what it currently is. Use it to know which file to edit when a hardware
-measurement arrives.
+Lists every configurable value, the file it lives in, its unit, and its status.
 
 Status meanings:
-- **Set:** a real value from the team or a measurement.
-- **Placeholder:** a stand-in value. Do not use results from it for flight.
+- **Set:** a real, agreed value.
+- **Placeholder:** a stand-in. Do not use results from it for flight.
 - **Pending:** not yet measured or decided. Must be filled before flight.
+- **Code only:** not in a file on purpose. Changing it requires a design change.
 
 ## 1. Fleet (`config/fleet.json`)
 
-| Key | Unit | Current value | Status | Who supplies it |
+| Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
 | `max_total_kg` | kg | 25.0 | Set | Team limit, covers all drones combined |
 
 ## 2. Each drone (`config/alpha.json`, `config/bravo.json`)
 
-| Key | Unit | Current value | Status | Who supplies it |
+| Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
 | `drone_id` | text | alpha / bravo | Set | Team naming |
 | `capabilities` | list | scout, delivery | Set | Both drones do both roles |
-| `telemetry_source` | `simulated` or `mavlink` | simulated | Placeholder | Systems integration, when telemetry is live |
+| `telemetry_source` | `simulated` or `mavlink` | simulated | Placeholder | Systems integration, once telemetry is live |
 | `camera_calibration_file` | file path | null | Pending | Hardware team, after calibration |
-| `airframe_kg` | kg | 0.0 | Pending | Airframe owner, weighed with battery, no packet |
+| `airframe_kg` | kg | 0.0 | Pending | Airframe owner, weighed with battery and no packet |
 | `packet_kg` | kg | 0.2 | Set | Measured packet weight (200 g) |
-| `payload_packets` | count | 0 | Placeholder | Mission planning, how many packets this drone carries |
+| `payload_packets` | count | 0 | Placeholder | Mission planning |
 
-Rule: the sum of `airframe_kg + payload_packets × packet_kg` over all drones
-must be at most the fleet limit. Call `validate_fleet` with all loaded drone
-configs and the limit from `load_fleet_limit`; it raises `DroneConfigError`
-if the combined limit or unique-ID requirement is violated.
+Rule: the sum of `airframe_kg + payload_packets × packet_kg` over all drones must be at most `max_total_kg`. The loader checks this.
 
-## 3. Camera (currently in code, `nidar/camera_config.py`)
+## 3. Camera (`config/camera.json`)
 
-| Parameter | Unit | Current value | Status | Source |
+| Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
-| fx, fy | pixels | 1200.0 | Placeholder | Calibration |
-| cx, cy | pixels | 640, 360 | Placeholder | Calibration |
-| image width, height | pixels | 1280 × 720 | Placeholder | Flight resolution |
-| k1, k2, p1, p2 | dimensionless | 0 | Placeholder | Calibration |
-| k3 | dimensionless | not used | Pending | Stored from calibration, not yet in the engine |
+| `image_width`, `image_height` | pixels | 1280 × 720 | Placeholder | Flight resolution, hardware team |
+| `fx`, `fy` | pixels | 1200.0 | Placeholder | Calibration output |
+| `cx`, `cy` | pixels | 640.0, 360.0 | Placeholder | Calibration output |
+| `offset_cam_in_body_m` | metres, body FRD | [0, 0, 0.1] | Placeholder | Hardware measurement from the reference point |
+| `distortion_enabled` | true / false | false | Pending | Software, after distortion correction is implemented |
+| `k1`, `k2`, `p1`, `p2` | dimensionless | 0.0 | Placeholder | Calibration output |
 
-Planned: move these to a per-drone camera file, so each drone has its own
-calibration. Each drone's `camera_calibration_file` points to it.
+`distortion_enabled` and the `k`/`p` values have no effect on results yet. Distortion correction is not implemented.
 
-## 4. Camera and GNSS mounting (currently in code)
+Code only: the camera-to-body mounting matrix (Mounting A). It is the approved convention, set in `nidar/camera_config.py`.
 
-| Parameter | Unit | Current value | Status | Source |
+## 4. Range guard (`config/range_guard.json`)
+
+| Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
-| Camera offset in body frame (x, y, z) | mm | (0, 0, +100) | Placeholder | Hardware measurement |
-| Camera-to-body rotation | matrix | Mounting A | Set (approved), not yet verified on hardware | Hardware verification |
-| GNSS antenna offset (x, y, z) | mm | not used | Pending | Hardware measurement |
-| Camera roll, pitch, yaw | degrees | 0, 0, 0 | Pending | Inclinometer |
+| `enabled` | true / false | true | Set | Software |
+| `max_off_nadir_deg` | degrees | 60.0 | Placeholder | Field data |
+| `medium_confidence_off_nadir_deg` | degrees | 75.0 | Placeholder | Field data |
+| `action_on_exceed_max_off_nadir` | `reject`, `flag_low`, or `warn` | `flag_low` | Placeholder | Mission policy decision |
 
-## 5. Reference frame and ground (currently in code)
+Angles are entered in degrees. The loader converts them to radians.
 
-| Parameter | Unit | Current value | Status | Source |
+## 5. Target logic (`config/target_logic.json`)
+
+| Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
-| Origin latitude, longitude | degrees | 0.0, 0.0 default in engine | Pending | Survey reference point |
-| Origin altitude | m | 0.0 | Pending | Survey and altitude reference (MSL, ellipsoidal) |
-| Ground elevation (`ground_z`) | m | 0.0 (flat ground) | Placeholder | Site survey |
+| `reassignment.low_confidence_below` | 0–1 | 0.6 | Placeholder | Field data |
+| `reassignment.high_confidence_at` | 0–1 | 0.85 | Placeholder | Field data |
+| `reassignment.min_margin` | 0–1 | 0.2 | Placeholder | Field data |
 
-## 6. Target logic (currently in code)
+## 6. Deduplication (code only, for now)
 
-| Parameter | Unit | Current value | Status | Source |
+| Parameter | Unit | Current value | Status | Notes |
 |---|---|---|---|---|
-| Reassignment: low confidence below | 0–1 | 0.6 | Placeholder | Field data |
-| Reassignment: high confidence at | 0–1 | 0.85 | Placeholder | Field data |
-| Reassignment: minimum margin | 0–1 | 0.2 | Placeholder | Field data |
-| Alert threshold (wayback high confidence) | 0–1 | uses high confidence above | Placeholder | Field data |
-| Duplicate radius | metres | 3.0 | Placeholder | Field data, measured accuracy |
-| Range guard: max off-nadir | degrees | 60 | Placeholder | Field data |
-| Range guard: medium-confidence angle | degrees | 75 | Placeholder | Field data |
+| `spatial_threshold_pixels` | pixels | 50.0 | Placeholder | Pixel-space deduplication, applied to one drone's own detections. Not yet in a file. |
+
+Cross-drone deduplication in metres is deferred until geolocation accuracy is measured in the ground-truth test.
 
 ## 7. Not yet configurable
 
-- Telemetry source (MAVLink) for live position and attitude.
+- Telemetry source for live position and attitude (MAVLink).
 - Frame timestamps for stale-detection checks.
-- Drop-phase signal from the drop automation.
+- Drop-phase signal from drop automation.
 
 ## Where to edit
 
 1. Fleet limit: `config/fleet.json`.
-2. Per-drone values: `config/<drone>.json`.
-3. Everything in sections 3 to 6 is still in code; it will move to config files in a later step.
+2. Per-drone values: `config/alpha.json`, `config/bravo.json`.
+3. Camera values: `config/camera.json`.
+4. Range guard: `config/range_guard.json`.
+5. Reassignment policy: `config/target_logic.json`.
+6. Deduplication threshold: code only, in `nidar/deduplicator.py`.
