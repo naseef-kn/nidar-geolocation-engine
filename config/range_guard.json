@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "max_off_nadir_deg": 60.0,
+  "medium_confidence_off_nadir_deg": 75.0,
+  "action_on_exceed_max_off_nadir": "flag_low"
+}
