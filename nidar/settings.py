@@ -37,6 +37,10 @@ RANGE_GUARD_KEYS = frozenset(
         "action_on_exceed_max_off_nadir",
     }
 )
+TARGET_LOGIC_KEYS = frozenset({"reassignment"})
+REASSIGNMENT_KEYS = frozenset(
+    {"low_confidence_below", "high_confidence_at", "min_margin"}
+)
 
 
 class SettingsError(ValueError):
@@ -135,3 +139,36 @@ def load_range_guard_config(path) -> RangeGuardConfig:
         medium_confidence_off_nadir_rad=float(np.radians(medium_deg)),
         action_on_exceed_max_off_nadir=action,
     )
+
+
+def _section(path, raw, key, allowed):
+    section = raw.get(key)
+    if not isinstance(section, dict):
+        raise SettingsError(f"{path}: '{key}' must be an object")
+    missing = allowed - section.keys()
+    if missing:
+        raise SettingsError(f"{path}: {key} missing {sorted(missing)}")
+    unknown = section.keys() - allowed
+    if unknown:
+        raise SettingsError(f"{path}: {key} has unknown keys {sorted(unknown)}")
+    return section
+
+
+def load_reassignment_policy(path):
+    """Load ReassignmentPolicy from config/target_logic.json."""
+    from nidar.mission import ReassignmentPolicy
+
+    raw = _read_object(path, TARGET_LOGIC_KEYS, TARGET_LOGIC_KEYS)
+    reassignment = _section(path, raw, "reassignment", REASSIGNMENT_KEYS)
+    try:
+        return ReassignmentPolicy(
+            low_confidence_below=_number(
+                path, "low_confidence_below", reassignment["low_confidence_below"]
+            ),
+            high_confidence_at=_number(
+                path, "high_confidence_at", reassignment["high_confidence_at"]
+            ),
+            min_margin=_number(path, "min_margin", reassignment["min_margin"]),
+        )
+    except ValueError as exc:
+        raise SettingsError(f"{path}: reassignment: {exc}") from exc

@@ -5,8 +5,14 @@ import numpy as np
 import pytest
 
 from nidar.camera_config import SYNTHETIC_CAMERA_CONFIG
+from nidar.mission import ReassignmentPolicy
 from nidar.range_guard import RangeGuardAction
-from nidar.settings import SettingsError, load_camera_config, load_range_guard_config
+from nidar.settings import (
+    SettingsError,
+    load_camera_config,
+    load_range_guard_config,
+    load_reassignment_policy,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -26,6 +32,14 @@ def camera_data(**overrides):
 def guard_data(**overrides):
     data = json.loads(
         (ROOT / "config" / "range_guard.json").read_text(encoding="utf-8")
+    )
+    data.update(overrides)
+    return data
+
+
+def target_logic_data(**overrides):
+    data = json.loads(
+        (ROOT / "config" / "target_logic.json").read_text(encoding="utf-8")
     )
     data.update(overrides)
     return data
@@ -132,3 +146,33 @@ def test_range_guard_unknown_action_rejected(tmp_path):
 def test_range_guard_enabled_must_be_boolean(tmp_path):
     with pytest.raises(SettingsError, match="enabled"):
         load_range_guard_config(write(tmp_path, guard_data(enabled=1)))
+
+
+# --- Reassignment policy ---
+
+def test_shipped_policy_matches_defaults():
+    assert (
+        load_reassignment_policy(ROOT / "config" / "target_logic.json")
+        == ReassignmentPolicy()
+    )
+
+
+def test_policy_order_enforced(tmp_path):
+    data = target_logic_data()
+    data["reassignment"]["low_confidence_below"] = 0.9
+    with pytest.raises(SettingsError, match="reassignment"):
+        load_reassignment_policy(write(tmp_path, data))
+
+
+def test_policy_unknown_key_rejected(tmp_path):
+    data = target_logic_data()
+    data["reassignment"]["min_margn"] = 0.2
+    with pytest.raises(SettingsError, match="unknown keys"):
+        load_reassignment_policy(write(tmp_path, data))
+
+
+def test_policy_missing_section_rejected(tmp_path):
+    data = target_logic_data()
+    del data["reassignment"]
+    with pytest.raises(SettingsError, match="reassignment"):
+        load_reassignment_policy(write(tmp_path, data))
