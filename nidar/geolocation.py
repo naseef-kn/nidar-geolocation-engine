@@ -288,10 +288,11 @@ def compute_geolocation(
         pixel_v=pixel_v,
         pixel_confidence=pixel_confidence,
         slant_range_m=slant_range_m,
-        off_nadir_angle_deg=validation_result.off_nadir_angle_deg or 0.0,
+        off_nadir_angle_deg=validation_result.off_nadir_angle_deg,
         validation_confidence=validation_result.confidence_level,
         ray_world=ray_world.copy(),
         camera_origin_world=camera_origin_world.copy(),
+        is_valid=validation_result.is_valid,
     )
     
     debug_info = None

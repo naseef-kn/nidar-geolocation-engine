@@ -6,11 +6,14 @@ a PixelDetection into coordinates using compute_geolocation, then reports the
 result through Drone.report_target. Errors from the engine propagate unchanged.
 """
 
+from typing import Optional
+
 from nidar.camera_config import CameraConfig
 from nidar.detection import PixelDetection
 from nidar.drone import Drone
 from nidar.geolocated_target import GeolocatedTarget
 from nidar.geolocation import DroneState, compute_geolocation
+from nidar.range_guard import RangeGuardConfig
 
 
 class FrameSizeMismatchError(ValueError):
@@ -24,12 +27,17 @@ def geolocate_and_report(
     camera_config: CameraConfig,
     target_id: str,
     phase: str = "outbound",
+    range_guard_config: Optional[RangeGuardConfig] = None,
 ) -> GeolocatedTarget:
     """
-    Geolocate one detection and report it to the GCS.
+    Geolocate one detection and report it to the GCS if the range guard accepts it.
 
-    Refuses a detection whose frame size differs from the camera config,
-    because its pixel coordinates would be in a different scale.
+    A target the guard rejects (is_valid False) is not reported. It is still
+    returned, so the caller can log it. Low-confidence but valid targets are
+    reported with their engine confidence, which already includes the
+    validation multiplier.
+
+    Refuses a detection whose frame size differs from the camera config.
 
     Returns the GeolocatedTarget so the caller can log it.
     """
@@ -49,13 +57,15 @@ def geolocate_and_report(
         pixel_confidence=detection.confidence,
         camera_config=camera_config,
         drone_state=drone_state,
+        range_guard_config=range_guard_config,
     )
 
-    drone.report_target(
-        target_id=target_id,
-        latitude=target.latitude_deg,
-        longitude=target.longitude_deg,
-        confidence=target.confidence,
-        phase=phase,
-    )
+    if target.is_valid:
+        drone.report_target(
+            target_id=target_id,
+            latitude=target.latitude_deg,
+            longitude=target.longitude_deg,
+            confidence=target.confidence,
+            phase=phase,
+        )
     return target

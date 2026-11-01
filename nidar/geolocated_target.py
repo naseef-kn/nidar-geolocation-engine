@@ -68,7 +68,7 @@ class GeolocatedTarget:
     slant_range_m: float
     """Distance along ray from camera to ground intersection (metres)."""
     
-    off_nadir_angle_deg: float
+    off_nadir_angle_deg: Optional[float]
     """Angle from nadir (0 = straight down, 90 = horizontal)."""
     
     validation_confidence: str
@@ -80,6 +80,8 @@ class GeolocatedTarget:
     
     camera_origin_world: Optional[np.ndarray] = None
     """Camera position in world frame (NED), useful for analysis."""
+
+    is_valid: bool = True
     
     def __post_init__(self) -> None:
         """Validate geolocated target."""
@@ -91,7 +93,9 @@ class GeolocatedTarget:
             raise ValueError(f"pixel_confidence must be in [0, 1], got {self.pixel_confidence}")
         
         # Off-nadir angle must be [0, 90]
-        if not (0 <= self.off_nadir_angle_deg <= 90.0):
+        if self.off_nadir_angle_deg is not None and not (
+            0 <= self.off_nadir_angle_deg <= 90.0
+        ):
             raise ValueError(f"off_nadir_angle_deg must be in [0, 90], got {self.off_nadir_angle_deg}")
         
         # Slant range must be positive
