@@ -176,3 +176,23 @@ def test_policy_missing_section_rejected(tmp_path):
     del data["reassignment"]
     with pytest.raises(SettingsError, match="reassignment"):
         load_reassignment_policy(write(tmp_path, data))
+
+
+def test_build_coordinator_uses_file_policy(tmp_path):
+    from nidar.coordinator import Coordinator
+    from nidar.settings import build_coordinator
+    from nidar.transport import InMemoryTransport
+
+    data = target_logic_data()
+    data["reassignment"]["high_confidence_at"] = 0.9
+    coordinator = build_coordinator(InMemoryTransport(), write(tmp_path, data))
+    assert isinstance(coordinator, Coordinator)
+    assert coordinator._policy.high_confidence_at == 0.9
+
+
+def test_build_coordinator_default_matches_code_default():
+    from nidar.settings import build_coordinator
+    from nidar.transport import InMemoryTransport
+
+    coordinator = build_coordinator(InMemoryTransport())
+    assert coordinator._policy == ReassignmentPolicy()

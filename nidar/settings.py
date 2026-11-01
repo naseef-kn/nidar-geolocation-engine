@@ -172,3 +172,16 @@ def load_reassignment_policy(path):
         )
     except ValueError as exc:
         raise SettingsError(f"{path}: reassignment: {exc}") from exc
+
+
+DEFAULT_TARGET_LOGIC_PATH = (
+    Path(__file__).resolve().parent.parent / "config" / "target_logic.json"
+)
+
+
+def build_coordinator(transport, target_logic_path=DEFAULT_TARGET_LOGIC_PATH):
+    """Create a Coordinator whose reassignment policy comes from a config file."""
+    from nidar.coordinator import Coordinator
+
+    policy = load_reassignment_policy(target_logic_path)
+    return Coordinator(transport, policy=policy)
