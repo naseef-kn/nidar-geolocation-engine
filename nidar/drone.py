@@ -6,6 +6,7 @@ transport, and sends and receives messages through it. It contains no
 mission logic; task assignment is handled elsewhere.
 """
 
+import math
 from typing import Any
 
 from nidar.drone_config import DroneConfig
@@ -21,6 +22,15 @@ MESSAGE_TYPES_BY_CAPABILITY = {
 }
 ALWAYS_ALLOWED = frozenset({"heartbeat"})
 VALID_PHASES = frozenset({"outbound", "wayback"})
+
+
+def _require_finite(name: str, value: float) -> None:
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+    ):
+        raise ValueError(f"{name} must be a finite number, got {value!r}")
 
 
 class MessageNotAllowedError(Exception):
@@ -74,6 +84,15 @@ class Drone:
         phase is "outbound" (flying to the delivery area) or "wayback"
         (returning). The coordinator alerts other drones only for wayback reports.
         """
+        _require_finite("latitude", latitude)
+        _require_finite("longitude", longitude)
+        _require_finite("confidence", confidence)
+        if not -90.0 <= latitude <= 90.0:
+            raise ValueError(f"latitude must be in [-90, 90], got {latitude}")
+        if not -180.0 <= longitude <= 180.0:
+            raise ValueError(f"longitude must be in [-180, 180], got {longitude}")
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError(f"confidence must be in [0, 1], got {confidence}")
         if phase not in VALID_PHASES:
             raise ValueError(
                 f"phase must be one of {sorted(VALID_PHASES)}, got {phase!r}"

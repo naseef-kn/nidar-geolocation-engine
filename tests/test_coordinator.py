@@ -1,7 +1,12 @@
 import pytest
 
 from nidar.coordinator import Coordinator
-from nidar.mission import ReassignmentPolicy, Target, TargetStatus
+from nidar.mission import (
+    ReassignmentPolicy,
+    Target,
+    TargetStatus,
+    UnknownTargetError,
+)
 from nidar.transport import GCS_ID, InMemoryTransport, Message
 
 
@@ -191,3 +196,31 @@ def test_no_alert_when_no_other_drone_has_payload(setup):
     report_target(transport, "alpha", "t1", 0.95, phase="wayback")
     coord.process_inbox()
     assert coord.alerts == []
+
+
+def test_malformed_target_found_is_recorded_not_crashed(setup):
+    transport, coord = setup
+    transport.send(
+        Message(
+            "alpha",
+            GCS_ID,
+            "target_found",
+            {
+                "target_id": "t9",
+                "latitude": float("nan"),
+                "longitude": 77.59,
+                "confidence": 0.9,
+            },
+        )
+    )
+    coord.process_inbox()
+    assert coord.rejected and coord.rejected[0][0] == "alpha"
+    with pytest.raises(UnknownTargetError):
+        coord.registry.get("t9")
+
+
+def test_missing_field_in_target_found_is_recorded(setup):
+    transport, coord = setup
+    transport.send(Message("alpha", GCS_ID, "target_found", {"target_id": "t9"}))
+    coord.process_inbox()
+    assert len(coord.rejected) == 1

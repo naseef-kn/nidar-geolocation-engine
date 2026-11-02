@@ -5,7 +5,10 @@ Drones report facts and execute. The coordinator decides which drone delivers
 to which target, and when a delivery should be switched to a better target.
 """
 
+import math
+
 from nidar.mission import (
+    DuplicateTargetError,
     ReassignmentPolicy,
     Target,
     TargetRegistry,
@@ -27,6 +30,8 @@ class Coordinator:
         self._known_drones: set[str] = set()
         # Alerts sent so far, as (drone_id, target_id). Kept for tests and debugging.
         self.alerts: list[tuple[str, str]] = []
+        # Malformed messages that were skipped, kept for inspection.
+        self.rejected: list[tuple[str, str]] = []
 
     def register_drone(self, drone_id: str, payload_capacity: int) -> None:
         """
@@ -61,13 +66,28 @@ class Coordinator:
 
     def _on_target_found(self, message: Message) -> None:
         p = message.payload
-        target = Target(
-            target_id=p["target_id"],
-            latitude=p["latitude"],
-            longitude=p["longitude"],
-            confidence=p["confidence"],
-        )
-        self.registry.add(target)
+        try:
+            target = Target(
+                target_id=p["target_id"],
+                latitude=float(p["latitude"]),
+                longitude=float(p["longitude"]),
+                confidence=float(p["confidence"]),
+            )
+            if not all(
+                math.isfinite(value)
+                for value in (target.latitude, target.longitude, target.confidence)
+            ):
+                raise ValueError("non-finite value")
+            if not (
+                -90 <= target.latitude <= 90 and -180 <= target.longitude <= 180
+            ):
+                raise ValueError("coordinates out of range")
+            if not 0.0 <= target.confidence <= 1.0:
+                raise ValueError("confidence out of range")
+            self.registry.add(target)
+        except (KeyError, TypeError, ValueError, DuplicateTargetError) as exc:
+            self.rejected.append((message.sender, str(exc)))
+            return
         self._maybe_alert_for(
             target,
             reporter=message.sender,

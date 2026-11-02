@@ -157,3 +157,29 @@ def test_delivery_only_drone_cannot_report_target(transport):
     drone = make_drone(transport, capabilities=("delivery",))
     with pytest.raises(MessageNotAllowedError):
         drone.report_target("t1", 12.97, 77.59, 0.9)
+
+
+@pytest.mark.parametrize(
+    "lat,lon,conf",
+    [
+        (float("nan"), 77.59, 0.9),
+        (12.97, float("inf"), 0.9),
+        (12.97, 77.59, float("nan")),
+        (91.0, 77.59, 0.9),
+        (-91.0, 77.59, 0.9),
+        (12.97, 181.0, 0.9),
+        (12.97, 77.59, 1.5),
+        (12.97, 77.59, -0.1),
+    ],
+)
+def test_report_target_rejects_invalid_values(transport, lat, lon, conf):
+    drone = make_drone(transport, capabilities=("scout",))
+    with pytest.raises(ValueError):
+        drone.report_target("t1", lat, lon, conf)
+    assert transport.receive(GCS_ID) is None
+
+
+def test_report_target_accepts_boundary_values(transport):
+    drone = make_drone(transport, capabilities=("scout",))
+    drone.report_target("t1", 90.0, -180.0, 1.0)
+    assert transport.receive(GCS_ID).msg_type == "target_found"

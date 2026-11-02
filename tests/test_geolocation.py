@@ -145,6 +145,24 @@ class TestCore:
         assert target is not None
         assert debug is not None
         assert debug.off_nadir_angle_deg == pytest.approx(0.0, abs=1e-3)
+
+    def test_drone_state_rejects_nan_position(self):
+        with pytest.raises(ValueError, match="finite"):
+            DroneState(
+                position_ned_m=(float("nan"), 0.0, -50.0),
+                roll_rad=0.0,
+                pitch_rad=0.0,
+                yaw_rad=0.0,
+            )
+
+    def test_drone_state_rejects_infinite_attitude(self):
+        with pytest.raises(ValueError, match="finite"):
+            DroneState(
+                position_ned_m=(0.0, 0.0, -50.0),
+                roll_rad=float("inf"),
+                pitch_rad=0.0,
+                yaw_rad=0.0,
+            )
     
     def test_T2_corner_pixel_southeast(self, level_drone_state):
         """

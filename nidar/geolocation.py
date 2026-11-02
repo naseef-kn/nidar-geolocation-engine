@@ -23,6 +23,7 @@ This engine is pure geometry. No hard-coded camera parameters.
 All parameters come from CameraConfig and RangeGuardConfig.
 """
 
+import math
 import numpy as np
 from typing import Tuple, Optional
 
@@ -97,6 +98,18 @@ class DroneState:
         self.roll_rad = float(roll_rad)
         self.pitch_rad = float(pitch_rad)
         self.yaw_rad = float(yaw_rad)
+
+        if not np.all(np.isfinite(self.position_ned_m)):
+            raise ValueError(
+                f"position_ned_m must be finite, got {position_ned_m}"
+            )
+        for name, value in (
+            ("roll_rad", self.roll_rad),
+            ("pitch_rad", self.pitch_rad),
+            ("yaw_rad", self.yaw_rad),
+        ):
+            if not math.isfinite(value):
+                raise ValueError(f"{name} must be finite, got {value}")
         
         # Validate position is above ground (z < 0 in NED)
         if self.position_ned_m[2] >= 0:
