@@ -19,6 +19,10 @@ from typing import Optional
 import numpy as np
 
 
+def _fmt_angle(value: Optional[float]) -> str:
+    return "n/a" if value is None else f"{value:.1f}°"
+
+
 @dataclass
 class GeolocatedTarget:
     """
@@ -169,7 +173,7 @@ class GeolocatedTarget:
         return (
             f"GeolocatedTarget("
             f"lat={self.latitude_deg:.6f}°, lon={self.longitude_deg:.6f}°, alt={self.altitude_m:.1f}m, "
-            f"conf={self.confidence:.2f}, off_nadir={self.off_nadir_angle_deg:.1f}°, "
+            f"conf={self.confidence:.2f}, off_nadir={_fmt_angle(self.off_nadir_angle_deg)}, "
             f"val={self.validation_confidence})"
         )
 
@@ -204,7 +208,7 @@ class GeolocationDebugInfo:
     altitude_m: float
     
     # Validation
-    off_nadir_angle_deg: float
+    off_nadir_angle_deg: Optional[float]
     validation_result_reason: str
 
 

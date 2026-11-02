@@ -163,3 +163,43 @@ def test_off_nadir_is_none_when_unknown():
     )
     assert target.off_nadir_angle_deg is None
     assert target.is_valid is True
+
+
+def test_string_representation_handles_unknown_off_nadir():
+    target = GeolocatedTarget(
+        latitude_deg=12.97,
+        longitude_deg=77.59,
+        altitude_m=0.0,
+        confidence=0.5,
+        pixel_u=0.0,
+        pixel_v=0.0,
+        pixel_confidence=0.5,
+        slant_range_m=50.0,
+        off_nadir_angle_deg=None,
+        validation_confidence="low",
+    )
+    assert "n/a" in str(target)
+
+
+def test_flagged_medium_confidence_target_is_reported(drone_and_transport):
+    drone, transport = drone_and_transport
+    guard = RangeGuardConfig(
+        max_off_nadir_angle_rad=np.radians(20.0),
+        medium_confidence_off_nadir_rad=np.radians(30.0),
+        action_on_exceed_max_off_nadir=RangeGuardAction.FLAG_LOW_CONFIDENCE,
+    )
+
+    target = geolocate_and_report(
+        drone,
+        edge_detection(confidence=0.9),
+        level_state(),
+        CAM,
+        target_id="t1",
+        range_guard_config=guard,
+    )
+
+    assert target.is_valid is True
+    assert target.validation_confidence == "medium"
+    assert target.confidence == pytest.approx(0.9 * 0.7)
+    message = transport.receive(GCS_ID)
+    assert message.payload["confidence"] == pytest.approx(0.9 * 0.7)

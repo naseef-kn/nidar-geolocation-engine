@@ -311,7 +311,7 @@ def compute_geolocation(
             latitude_deg=latitude_deg,
             longitude_deg=longitude_deg,
             altitude_m=altitude_m,
-            off_nadir_angle_deg=validation_result.off_nadir_angle_deg or 0.0,
+            off_nadir_angle_deg=validation_result.off_nadir_angle_deg,
             validation_result_reason=validation_result.reason,
         )
     

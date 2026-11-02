@@ -131,6 +131,20 @@ class TestCore:
         assert np.isclose(debug.ray_world_frame[2], 1.0, atol=1e-6)
         assert np.isclose(debug.ray_world_frame[0], 0.0, atol=1e-6)
         assert np.isclose(debug.ray_world_frame[1], 0.0, atol=1e-6)
+
+    def test_debug_info_includes_off_nadir_angle(self, level_drone_state):
+        target, debug = compute_geolocation(
+            pixel_u=640.0,
+            pixel_v=360.0,
+            pixel_confidence=0.9,
+            camera_config=SYNTHETIC_CAMERA_CONFIG,
+            drone_state=level_drone_state,
+            return_debug_info=True,
+        )
+
+        assert target is not None
+        assert debug is not None
+        assert debug.off_nadir_angle_deg == pytest.approx(0.0, abs=1e-3)
     
     def test_T2_corner_pixel_southeast(self, level_drone_state):
         """
