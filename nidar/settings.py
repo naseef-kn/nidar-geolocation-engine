@@ -6,6 +6,7 @@ Mounting A definition and stays in nidar/camera_config.py.
 """
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -41,6 +42,7 @@ TARGET_LOGIC_KEYS = frozenset({"reassignment", "crossframe"})
 REASSIGNMENT_KEYS = frozenset(
     {"low_confidence_below", "high_confidence_at", "min_margin"}
 )
+CROSSFRAME_KEYS = frozenset({"duplicate_radius_m", "_note"})
 
 
 class SettingsError(ValueError):
@@ -172,6 +174,23 @@ def load_reassignment_policy(path):
         )
     except ValueError as exc:
         raise SettingsError(f"{path}: reassignment: {exc}") from exc
+
+
+def load_crossframe_radius(path) -> float:
+    """Read and validate the cross-frame duplicate radius (metres)."""
+    raw = _read_object(path, TARGET_LOGIC_KEYS, TARGET_LOGIC_KEYS)
+    section = raw.get("crossframe")
+    if not isinstance(section, dict) or "duplicate_radius_m" not in section:
+        raise SettingsError(f"{path}: 'crossframe.duplicate_radius_m' is required")
+    unknown = section.keys() - CROSSFRAME_KEYS
+    if unknown:
+        raise SettingsError(f"{path}: crossframe has unknown keys {sorted(unknown)}")
+    radius = _number(path, "duplicate_radius_m", section["duplicate_radius_m"])
+    if not (math.isfinite(radius) and radius > 0):
+        raise SettingsError(
+            f"{path}: duplicate_radius_m must be a finite number > 0"
+        )
+    return radius
 
 
 DEFAULT_TARGET_LOGIC_PATH = (

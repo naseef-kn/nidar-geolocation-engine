@@ -10,6 +10,7 @@ from nidar.range_guard import RangeGuardAction
 from nidar.settings import (
     SettingsError,
     load_camera_config,
+    load_crossframe_radius,
     load_range_guard_config,
     load_reassignment_policy,
 )
@@ -176,6 +177,31 @@ def test_policy_missing_section_rejected(tmp_path):
     del data["reassignment"]
     with pytest.raises(SettingsError, match="reassignment"):
         load_reassignment_policy(write(tmp_path, data))
+
+
+def test_shipped_crossframe_radius_is_3_metres():
+    assert load_crossframe_radius(ROOT / "config" / "target_logic.json") == 3.0
+
+
+def test_crossframe_radius_must_be_positive(tmp_path):
+    data = target_logic_data()
+    data["crossframe"]["duplicate_radius_m"] = 0
+    with pytest.raises(SettingsError, match="duplicate_radius_m"):
+        load_crossframe_radius(write(tmp_path, data))
+
+
+def test_crossframe_radius_rejects_nan(tmp_path):
+    data = target_logic_data()
+    data["crossframe"]["duplicate_radius_m"] = float("nan")
+    with pytest.raises(SettingsError):
+        load_crossframe_radius(write(tmp_path, data))
+
+
+def test_crossframe_missing_section_rejected(tmp_path):
+    data = target_logic_data()
+    del data["crossframe"]
+    with pytest.raises(SettingsError, match="crossframe"):
+        load_crossframe_radius(write(tmp_path, data))
 
 
 def test_build_coordinator_uses_file_policy(tmp_path):
