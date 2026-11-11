@@ -37,7 +37,7 @@ RANGE_GUARD_KEYS = frozenset(
         "action_on_exceed_max_off_nadir",
     }
 )
-TARGET_LOGIC_KEYS = frozenset({"reassignment"})
+TARGET_LOGIC_KEYS = frozenset({"reassignment", "crossframe"})
 REASSIGNMENT_KEYS = frozenset(
     {"low_confidence_below", "high_confidence_at", "min_margin"}
 )
