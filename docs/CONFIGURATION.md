@@ -41,7 +41,7 @@ Rule: the sum of `airframe_kg + payload_packets × packet_kg` over all drones mu
 
 `distortion_enabled` and the `k`/`p` values have no effect on results yet. Distortion correction is not implemented.
 
-Code only: the camera-to-body mounting matrix (Mounting A). It is the approved convention, set in `nidar/camera_config.py`.
+Code only: the camera-to-body mounting matrix (Mounting A), set in `nidar/camera_config.py`.
 
 ## 4. Range guard (`config/range_guard.json`)
 
@@ -52,25 +52,33 @@ Code only: the camera-to-body mounting matrix (Mounting A). It is the approved c
 | `medium_confidence_off_nadir_deg` | degrees | 75.0 | Placeholder | Field data |
 | `action_on_exceed_max_off_nadir` | `reject`, `flag_low`, or `warn` | `flag_low` | Placeholder | Mission policy decision |
 
-Angles are entered in degrees. The loader converts them to radians.
+Angles are entered in degrees. The loader converts them to radians. A target beyond the max angle with `flag_low` is reported with medium confidence (×0.7), not rejected.
 
-## 5. Target logic (`config/target_logic.json`)
+## 5. Reassignment policy (`config/target_logic.json`, `reassignment`)
 
 | Key | Unit | Current value | Status | Supplied by |
 |---|---|---|---|---|
-| `reassignment.low_confidence_below` | 0–1 | 0.6 | Placeholder | Field data |
-| `reassignment.high_confidence_at` | 0–1 | 0.85 | Placeholder | Field data |
-| `reassignment.min_margin` | 0–1 | 0.2 | Placeholder | Field data |
+| `low_confidence_below` | 0–1 | 0.6 | Placeholder | Field data |
+| `high_confidence_at` | 0–1 | 0.85 | Placeholder | Field data |
+| `min_margin` | 0–1 | 0.2 | Placeholder | Field data |
 
-## 6. Deduplication (code only, for now)
+These values are used by the coordinator's wayback alert rule (`high_confidence_at`). `low_confidence_below` and `min_margin` apply to the reassignment function, which the coordinator no longer calls automatically.
+
+## 6. Cross-frame deduplication (`config/target_logic.json`, `crossframe`)
+
+| Key | Unit | Current value | Status | Supplied by |
+|---|---|---|---|---|
+| `duplicate_radius_m` | metres | 3.0 | Placeholder, unmeasured | Ground-truth test, after geolocation accuracy is measured |
+
+The loader validates this value at load time, so a zero, negative, or non-finite radius fails before any run. The matching code uses this radius for distance-only matching. The time window is not implemented yet and waits on frame timestamps.
+
+## 7. Per-drone pixel deduplication (code only)
 
 | Parameter | Unit | Current value | Status | Notes |
 |---|---|---|---|---|
-| `spatial_threshold_pixels` | pixels | 50.0 | Placeholder | Pixel-space deduplication, applied to one drone's own detections. Not yet in a file. |
+| `spatial_threshold_pixels` | pixels | 50.0 | Placeholder | Applied to one drone's own frame detections. Not in a file. |
 
-Cross-drone deduplication in metres is deferred until geolocation accuracy is measured in the ground-truth test.
-
-## 7. Not yet configurable
+## 8. Not yet configurable
 
 - Telemetry source for live position and attitude (MAVLink).
 - Frame timestamps for stale-detection checks.
@@ -82,5 +90,7 @@ Cross-drone deduplication in metres is deferred until geolocation accuracy is me
 2. Per-drone values: `config/alpha.json`, `config/bravo.json`.
 3. Camera values: `config/camera.json`.
 4. Range guard: `config/range_guard.json`.
-5. Reassignment policy: `config/target_logic.json`.
-6. Deduplication threshold: code only, in `nidar/deduplicator.py`.
+5. Reassignment policy and cross-frame radius: `config/target_logic.json`.
+6. Per-drone pixel threshold: code only, in `nidar/deduplicator.py`.
+
+See `docs/KNOWN_LIMITATIONS.md` for what the software does not yet guarantee.
